@@ -58,6 +58,7 @@ def training_logistic(x, y,learning_rate=0.01):
     n_samples, n_features = x.shape
     w = np.zeros(n_features)
     b = 0
+    print(n_samples)
 
     for epoch in range(epochs):
         indices = np.arange(n_samples)
@@ -84,6 +85,46 @@ def predict_logistic(X,w,b):
     z = X @ w + b
     y = sigmoid(z)
     return (y >= threshold).astype(int)
+
+# Naive Bayes
+
+def train_naive_bayes(X,y):
+    n_samples, n_features = X.shape
+    classes = np.unique(y)
+    vocabulary = range(n_features)
+
+    logprior = {}
+    loglikelihood = {}
+
+    for cls in classes:
+        X_cls = X[y == cls]
+        N_c = X_cls.shape[0]
+        logprior[cls] = np.log(N_c / n_samples)
+
+        word_count_in_class = np.sum(X_cls, axis=0)
+        total_word_count = np.sum(word_count_in_class)
+
+        loglikelihood[cls] =  np.log((word_count_in_class + 1) / (total_word_count + vocabulary))
+
+    return logprior,loglikelihood,vocabulary,classes
+
+def predict_naive_bayes(X,logprior,loglikelihood,classes):
+    n_samples, n_features = X.shape
+    predictions = []
+
+    for i in range(n_samples):
+        sum_posteriors = {}
+
+        for cls in classes:
+            sum_posteriors[cls] = logprior[cls]
+
+            for j in range(n_features):
+                if X[i,j]>0:
+                    sum_posteriors[cls] += X[i,j] * loglikelihood[cls][j]
+
+        predictions.append(max(sum_posteriors, key=sum_posteriors.get))
+
+    return np.array(predictions)
 
 
 
@@ -113,16 +154,32 @@ def main():
     y_val_np = y_val.to_numpy()
     y_test_np = y_test.to_numpy()
 
-    # Step 2: Train the Model
-    print("Training logistic regression model...\n")
-    w, b = training_logistic(X_train_dense, y_train_np,learning_rate=0.01)
+    # Train LOGISTIC ---------------------------------------------------
+    # print("Training logistic regression model...\n")
+    # w, b = training_logistic(X_train_dense, y_train_np,learning_rate=0.01)
 
-    # Step 3: Make Predictions
+    # #  Make Predictions
+    # print("Making predictions...\n")
+    # y_val_pred = predict_logistic(X_val_dense, w, b)
+    # y_test_pred = predict_logistic(X_test_dense, w, b)
+
+    # # Step 4: Evaluate the Model
+    # print("Evaluating model on validation set...\n")
+    # evaluate(y_val_np, y_val_pred)
+
+    # print("\nEvaluating model on test set...\n")
+    # evaluate(y_test_np, y_test_pred)
+
+    # NAIVE BAYES ---------------------------------------------------
+    print("Training Naive Bayes model...\n")
+    logprior, loglikelihood, vocabulary, classes = train_naive_bayes(X_train_dense, y_train_np)
+
     print("Making predictions...\n")
-    y_val_pred = predict_logistic(X_val_dense, w, b)
-    y_test_pred = predict_logistic(X_test_dense, w, b)
+  
+    y_val_pred = predict_naive_bayes(X_val_dense, logprior, loglikelihood, classes)
+   
+    y_test_pred = predict_naive_bayes(X_test_dense, logprior, loglikelihood, classes)
 
-    # Step 4: Evaluate the Model
     print("Evaluating model on validation set...\n")
     evaluate(y_val_np, y_val_pred)
 
