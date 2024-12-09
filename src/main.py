@@ -1,8 +1,11 @@
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix,classification_report
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+import argparse
 
 # Load training data
 train_data = pd.read_csv('data/train_data.csv')
@@ -58,7 +61,6 @@ def training_logistic(x, y,learning_rate=0.01):
     n_samples, n_features = x.shape
     w = np.zeros(n_features)
     b = 0
-    print(n_samples)
 
     for epoch in range(epochs):
         indices = np.arange(n_samples)
@@ -128,6 +130,7 @@ def predict_naive_bayes(X,logprior,loglikelihood,classes):
 
 
 
+
 def evaluate(y_true, y_pred):
     acc = accuracy_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred)
@@ -142,7 +145,22 @@ def evaluate(y_true, y_pred):
     print("Confusion Matrix:")
     print(cm)
 
+# to check if data is balanced.
+def count_labels(data, label_column):
+    label_counts = data[label_column].value_counts()
+    print(f"total samples : {len(data)}")
+    print("Label distribution:")
+    for label, count in label_counts.items():
+        print(f"Label {label}: {count} samples")
+    return label_counts
+
 def main():
+
+    parser = argparse.ArgumentParser(description="Run different machine learning models for sentiment classification.")
+    parser.add_argument('model', type=str, choices=['logistic', 'naive_bayes', 'random_forest', 'svm'],
+                        help="Choose which model to run: logistic, naive_bayes, random_forest, svm")
+    args = parser.parse_args()
+
     # Step 1: Prepare the Data
     print("Preparing data...")
     # Convert the sparse matrix to dense and extract labels
@@ -154,37 +172,107 @@ def main():
     y_val_np = y_val.to_numpy()
     y_test_np = y_test.to_numpy()
 
+
+    print("Training Data:")
+    train_label_counts = count_labels(train_data, 'sentiment')
+
+    print("\nValidation Data:")
+    val_label_counts = count_labels(val_data, 'sentiment')
+
+    print("\nTest Data:")
+    test_label_counts = count_labels(test_data, 'sentiment')
+
+
     # Train LOGISTIC ---------------------------------------------------
-    # print("Training logistic regression model...\n")
-    # w, b = training_logistic(X_train_dense, y_train_np,learning_rate=0.01)
+    if args.model == 'logistic':
+    
+        print("Training logistic regression model...\n")
+        w, b = training_logistic(X_train_dense, y_train_np,learning_rate=0.01)
 
-    # #  Make Predictions
-    # print("Making predictions...\n")
-    # y_val_pred = predict_logistic(X_val_dense, w, b)
-    # y_test_pred = predict_logistic(X_test_dense, w, b)
+        print("Making predictions...\n")
+        y_val_pred = predict_logistic(X_val_dense, w, b)
+        y_test_pred = predict_logistic(X_test_dense, w, b)
 
-    # # Step 4: Evaluate the Model
-    # print("Evaluating model on validation set...\n")
-    # evaluate(y_val_np, y_val_pred)
+      # Evaluate
+        print("logistic Validation Set:")
+        print(classification_report(y_val_np, y_val_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_val_np, y_val_pred))
 
-    # print("\nEvaluating model on test set...\n")
-    # evaluate(y_test_np, y_test_pred)
+        print("\nTest Set:")
+        print(classification_report(y_test_np, y_test_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_test_np, y_test_pred))
+
+
 
     # NAIVE BAYES ---------------------------------------------------
-    print("Training Naive Bayes model...\n")
-    logprior, loglikelihood, vocabulary, classes = train_naive_bayes(X_train_dense, y_train_np)
-
-    print("Making predictions...\n")
-  
-    y_val_pred = predict_naive_bayes(X_val_dense, logprior, loglikelihood, classes)
+    elif args.model == 'naive_bayes':
    
-    y_test_pred = predict_naive_bayes(X_test_dense, logprior, loglikelihood, classes)
+        print("Training Naive Bayes model...\n")
+        logprior, loglikelihood, vocabulary, classes = train_naive_bayes(X_train_dense, y_train_np)
 
-    print("Evaluating model on validation set...\n")
-    evaluate(y_val_np, y_val_pred)
+        print("Making predictions...\n")
+    
+        y_val_pred = predict_naive_bayes(X_val_dense, logprior, loglikelihood, classes)
+    
+        y_test_pred = predict_naive_bayes(X_test_dense, logprior, loglikelihood, classes)
 
-    print("\nEvaluating model on test set...\n")
-    evaluate(y_test_np, y_test_pred)
+      # Evaluate
+        print("Naive Bayes Validation Set:")
+        print(classification_report(y_val_np, y_val_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_val_np, y_val_pred))
+
+        print("\nTest Set:")
+        print(classification_report(y_test_np, y_test_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_test_np, y_test_pred))
+
+
+    # Random forest --------------------------------------------------------------
+    elif args.model == 'random_forest':
+        print("\nTraining Random forest model...\n")
+        forest = RandomForestClassifier(
+            n_estimators=100,      # Number of trees in the forest
+            max_depth=20,          # Maximum depth of the trees
+            max_features='sqrt',   # Number of features to consider for each split
+            random_state=42,       # Random seed for reproducibility
+            class_weight='balanced', # Handle class imbalance
+            n_jobs=-1              # Use all available CPU cores
+        )
+
+        forest.fit(X_train_dense, y_train_np)
+
+        y_val_pred = forest.predict(X_val_dense)
+        y_test_pred = forest.predict(X_test_dense)
+
+
+      # Evaluate
+        print("Random forest Validation Set:")
+        print(classification_report(y_val_np, y_val_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_val_np, y_val_pred))
+
+        print("\nTest Set:")
+        print(classification_report(y_test_np, y_test_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_test_np, y_test_pred))
+ 
+   #svm ---------------------------------------------
+    elif args.model == 'svm':
+        print("Training svm ...")
+        svm = LinearSVC(C=1.0, random_state=42)
+        svm.fit(X_train_dense, y_train_np)
+
+        # Predict
+        y_val_pred = svm.predict(X_val_dense)
+        y_test_pred = svm.predict(X_test_dense)
+
+
+        # Evaluate
+        print("svm Validation Set:")
+        print(classification_report(y_val_np, y_val_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_val_np, y_val_pred))
+
+        print("\nTest Set:")
+        print(classification_report(y_test_np, y_test_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_test_np, y_test_pred))
+
 
 
 
